@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  HomeAppApi
+
+
+Parameters:
+  UserPoolId:
+    Type: String
+    Description: User poolId for Cognito
+  CognitoIdp:
+    Type: String
+    Description: Cognito Idp
+
+
+Globals:
+  Function:
+    Timeout: 5
+    MemorySize: 128
+    Tracing: Active
+    LoggingConfig:
+      LogFormat: JSON
+
+
+
+Resources:
+  Api:
+    TracingEnable: true
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: v1
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            Type: CognitoAuthorizer
+            AuthorizationScopes:
+              - username
+              - openid
+              - profile
+            UserPoolArn: !Sub arn:aws:cognito-idp:${CognitoIdp}:userpool/${UserPoolId}
+        DefaultAuthorizer: CognitoAuthorizer
+
+        
+  MqttPublisherFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+      BuildTarget: build-MqttPublisherFunction
+    Properties:
+      CodeUri: .
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+      - x86_64
+      Events:
+        HelloWorldApi:
+          Type: Api 
+          Properties:
+            Method: Post
+            Path: /gates/open
+            RestApiId: !Ref Api
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - iot:Publish
+              Resource: arn:aws:iot:*:*:topic/openGate //TODO FOLGADO more specific ?
+
+
+  Test:
+    Type: AWS::Serverless::Function 
+    Metadata:
+      BuildMethod: makefile
+      BuildTarget: build-Test
+    Properties:
+      CodeUri: .
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+      - x86_64
+      Events:
+        CatchAll:
+          Type: Api 
+          Properties:
+            Path: /test
+            Method: GET
+            RestApiId: !Ref Api
+     

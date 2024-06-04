@@ -1,0 +1,9 @@
+# AWS SAM build artifacts and configurations
+.aws-sam/
+samconfig.toml
+
+# IDE and editor specific files
+.vscode/
+
+# Go dependency directories (for vendoring)
+vendor/
