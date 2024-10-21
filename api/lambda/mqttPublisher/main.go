@@ -40,9 +40,7 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	}, nil
 }
 
-// Function to publish a message to an AWS IoT topic
 func publishMessage(topic, message string) error {
-	// Load the AWS configuration
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return fmt.Errorf("unable to load SDK config: %w", err)
@@ -50,9 +48,18 @@ func publishMessage(topic, message string) error {
 
 	client := iotdataplane.NewFromConfig(cfg)
 
+	payload := map[string]string{
+		"message": message,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to publish message: %w", err)
+	}
+
 	input := &iotdataplane.PublishInput{
 		Topic:   &topic,
-		Payload: []byte(message),
+		Payload: []byte(jsonPayload),
 		Qos:     0,
 	}
 

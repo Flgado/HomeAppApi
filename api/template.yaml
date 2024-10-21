@@ -1,17 +1,21 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
+Description: |
   HomeAppApi
 
-
 Parameters:
-  UserPoolId:
+  UserPool:
     Type: String
-    Description: User poolId for Cognito
-  CognitoIdp:
+    Description: User pool for Cognito
+  AccountId:
     Type: String
-    Description: Cognito Idp
-
+    Description: Account Id
+  Region:
+    Type: String
+    Description: AWS Region
+  Audience:
+    Type: String
+    Description: Client id for user pool
 
 Globals:
   Function:
@@ -20,8 +24,6 @@ Globals:
     Tracing: Active
     LoggingConfig:
       LogFormat: JSON
-
-
 
 Resources:
   Api:
@@ -34,13 +36,12 @@ Resources:
           CognitoAuthorizer:
             Type: CognitoAuthorizer
             AuthorizationScopes:
-              - username
+              - email
               - openid
               - profile
-            UserPoolArn: !Sub arn:aws:cognito-idp:${CognitoIdp}:userpool/${UserPoolId}
+            UserPoolArn: !Sub arn:aws:cognito-idp:${Region}:${AccountId}:userpool/${Region}${UserPool}
         DefaultAuthorizer: CognitoAuthorizer
 
-        
   MqttPublisherFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -51,38 +52,46 @@ Resources:
       Handler: bootstrap
       Runtime: provided.al2
       Architectures:
-      - x86_64
+        - x86_64
       Events:
-        HelloWorldApi:
-          Type: Api 
+        ControlGate:
+          Type: Api
           Properties:
             Method: Post
-            Path: /gates/open
+            Path: /gates/control
             RestApiId: !Ref Api
+            Auth:
+              Authorizer: CognitoAuthorizer
+              AuthorizationScopes:
+                - !Sub Admins-${Audience}
       Policies:
         - Statement:
             - Effect: Allow
               Action:
                 - iot:Publish
-              Resource: arn:aws:iot:*:*:topic/openGate //TODO FOLGADO more specific ?
+              Resource: !Sub arn:aws:iot:${Region}:${AccountId}:topic/controlGate
 
-
-  Test:
-    Type: AWS::Serverless::Function 
+  GetUserProfileImage:
+    Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
-      BuildTarget: build-Test
+      BuildTarget: build-GetUserProfileImage
     Properties:
       CodeUri: .
       Handler: bootstrap
       Runtime: provided.al2
       Architectures:
-      - x86_64
+        - x86_64
       Events:
-        CatchAll:
-          Type: Api 
+        GetProfileImage:
+          Type: Api
           Properties:
-            Path: /test
-            Method: GET
+            Method: Get
+            Path: /profile-image
             RestApiId: !Ref Api
-     
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: arn:aws:s3:::jfolgado-homeapp-userprofile-v1/*
